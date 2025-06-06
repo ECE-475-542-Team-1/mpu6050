@@ -6,6 +6,8 @@
 
 MPU6050 imu;
 
+const String Current_time;
+
 // Low-pass filter
 float prevFilteredMag = 0;
 float alpha = 0.9;
@@ -18,16 +20,16 @@ int bufferIndex = 0;
 
 unsigned long lastBreathTime = 0;
 
-const char* ssid = "";
-const char* password = "";
-const char* serverUrl = "";
+const char* ssid = "iPhone (156)";
+const char* password = "key-1234";
+const char* serverUrl = "http://172.20.10.2:3000/api/imu";
 const char* apiKey = "my-secret-key";
 
-unsigned long lastSendTime = 0;
-const unsigned long SEND_INTERVAL = 15000;
 
 struct Reading {
-  float bpm;
+  unsigned long timestamp; 
+  float respiratoryRate;
+  
 };
 
 const int BATCH_SIZE_2 = 30;
@@ -67,6 +69,7 @@ void setup() {
 }
 
 void loop() {
+
   int16_t ax, ay, az;
   imu.getAcceleration(&ax, &ay, &az);
 
@@ -114,20 +117,21 @@ void loop() {
       fabsf(magBuffer[prev4] - magBuffer[prev3]) > 0.0 &&
       fabsf(magBuffer[prev3] - magBuffer[prev2]) > 0.0 &&
       fabsf(magBuffer[prev2] - magBuffer[prev]) > 0.0 
-      //mag_average > 0.06 &&
-      //delta > 0.04 && 
-      //!isStill(magBuffer, bufferSize, 0.0005)
+      // mag_average > 0.06 &&
+      // delta > 0.04 && 
+      // !isStill(magBuffer, bufferSize, 0.0005)
     ) {
       
       unsigned long now = millis();
       if (now - lastBreathTime > 3000) {
-        float bpm = 60000.0 / (now - lastBreathTime);
+        float respiratoryRate= 60000.0 / (now - lastBreathTime);
         lastBreathTime = now;
         Serial.print("Breath detected - BPM: ");
-        Serial.println(bpm);
+        Serial.println(respiratoryRate);
 
         buffer[bufferIndex2++] = {
-        .bpm = bpm
+        .timestamp = millis() / 1000.0,
+        .respiratoryRate = respiratoryRate
       };
       }
     }
@@ -173,8 +177,7 @@ void sendBatch() {
   String json = "[";
   for (int i = 0; i < bufferIndex2; i++) {
     json += "{\"timestamp\":" + String(buffer[i].timestamp) +
-            ",\"hr\":" + String(buffer[i].hr) +
-            ",\"spo2\":" + String(buffer[i].spo2) + "}";
+            ",\"respiratoryRate\":" + String(buffer[i].respiratoryRate) + "}";
     if (i < bufferIndex2 - 1) json += ",";
   }
   json += "]";
